@@ -123,12 +123,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_COMIC_FROM_BACKGROUND') {
     (async () => {
       try {
-        // const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-        // Temporary Debug: Hardcode check
-        const API_KEY = "AIzaSyCPurivlaBpWRQXEmSJES6H7EN0BuA2lTk";
+        const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
         // Debug Log: Check if key is loaded (masked)
-        console.log("[LexiLens] API Key detected:", API_KEY ? `${API_KEY.substring(0, 4)}... analytics check` : "MISSING");
+        console.log("[LexiLens] API Key detected:", API_KEY ? "YES (Hidden)" : "MISSING");
 
         if (!API_KEY || API_KEY.trim() === "") {
           console.error("Gemini API Key is missing or invalid.");
