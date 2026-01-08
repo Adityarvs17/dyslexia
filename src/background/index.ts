@@ -43,7 +43,12 @@ const setupContextMenus = () => {
 };
 
 chrome.runtime.onInstalled.addListener(() => {
-  // onInstalled handles both install and update (and reload in dev mode usually)
+  console.log('[LexiLens] Extension Installed/Updated. Setting up menus...');
+  setupContextMenus();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[LexiLens] Browser Startup. Setting up menus...');
   setupContextMenus();
 });
 
@@ -123,10 +128,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FETCH_COMIC_FROM_BACKGROUND') {
     (async () => {
       try {
-        const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+        // const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+        const API_KEY = "AIzaSyBT2caUzlOBVzMG3Y19cpNIUUcFNDxu4NE";
 
         // Debug Log: Check if key is loaded (masked)
-        console.log("[LexiLens] API Key detected:", API_KEY ? "YES (Hidden)" : "MISSING");
+        console.log("[LexiLens] API Key detected:", API_KEY ? `${API_KEY.substring(0, 4)}... analytics check` : "MISSING");
 
         if (!API_KEY || API_KEY.trim() === "") {
           console.error("Gemini API Key is missing or invalid.");
@@ -135,6 +141,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const genAI = new GoogleGenerativeAI(API_KEY);
+
+        // Helper to retry on 503 Overloaded errors with exponential backoff
+        const callWithRetry = async (fn: () => Promise<any>, retries = 3, delay = 1000): Promise<any> => {
+          try {
+            return await fn();
+          } catch (error: any) {
+            if (retries > 0 && (error.message?.includes('503') || error.message?.includes('overloaded'))) {
+              console.warn(`[LexiLens] API Overloaded (503). Retrying in ${delay}ms... (${retries} retries left)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              return callWithRetry(fn, retries - 1, delay * 2);
+            }
+            throw error;
+          }
+        };
 
         // Use a function to try multiple models in case one is restricted/not found
         const tryGenerate = async (modelName: string) => {
@@ -181,7 +201,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             - Captions: Integrate text into the art (on signs, carved into scenery). Use <text> tags with 'font-family: sans-serif; font-weight: 800;'.
             - Formatting: Return ONLY the raw <svg> code. No markdown code blocks. The SVG must be responsive (viewBox="0 0 1200 400").
           `;
-          const result = await model.generateContent(prompt);
+
+          // Wrap the API call with the retry logic
+          const result = await callWithRetry(() => model.generateContent(prompt));
           return await result.response;
         };
 
